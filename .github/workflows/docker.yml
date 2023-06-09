@@ -1,4 +1,4 @@
-name: Docker Build
+name: Docker Build and Test
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,19 +25,69 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push x86_64 image
+      - name: Build and test x86_64 image
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: true
+          push: false
           tags: alinakatrych1/zadanie2:x86_64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+        env:
+          DOCKER_CLI_EXPERIMENTAL: enabled
 
-      - name: Build and push arm64 image
+      - name: Build and test arm64 image
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: true
+          push: false
           tags: alinakatrych1/zadanie2:arm64
           platform: linux/arm64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+        env:
+          DOCKER_CLI_EXPERIMENTAL: enabled
+
+      - name: Scan images for vulnerabilities
+        uses: anchore/scan-action@v2
+        with:
+          image-name: alinakatrych1/zadanie2:x86_64
+          fail-on-policy: 'critical'
+          inline-scan-cache-dir: /tmp/.anchore-cache
+          inline-scan-cache-repo: ghcr.io/${{ github.repository }}
+        env:
+          ANCHORE_CLI_USER: ${{ secrets.ANCHORE_CLI_USER }}
+          ANCHORE_CLI_PASS: ${{ secrets.ANCHORE_CLI_PASS }}
+
+      - name: Push x86_64 image to GitHub Packages
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}/zadanie2:x86_64
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Scan images for vulnerabilities
+        uses: anchore/scan-action@v2
+        with:
+          image-name: alinakatrych1/zadanie2:arm64
+          fail-on-policy: 'critical'
+          inline-scan-cache-dir: /tmp/.anchore-cache
+          inline-scan-cache-repo: ghcr.io/${{ github.repository }}
+        env:
+          ANCHORE_CLI_USER: ${{ secrets.ANCHORE_CLI_USER }}
+          ANCHORE_CLI_PASS: ${{ secrets.ANCHORE_CLI_PASS }}
+
+      - name: Push arm64 image to GitHub Packages
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}/zadanie2:arm64
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
 
 
